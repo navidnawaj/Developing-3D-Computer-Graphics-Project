@@ -8,7 +8,7 @@ import time
 # ============================================================
 # SECTION 1: WINDOW & CONSTANTS
 # ============================================================
-W_WIDTH, W_HEIGHT = 1200, 800
+W_WIDTH, W_HEIGHT = 1440, 900
 
 # ============================================================
 # SECTION 2: PLANET DATABASE
@@ -61,9 +61,9 @@ PLANETS = [
 # SECTION 3: GLOBAL STATE
 # ============================================================
 cam_mode = 'overview'
-ov_angle_h = 45.0
-ov_angle_v = 35.0
-ov_distance = 900.0
+ov_angle_h = 200.0
+ov_angle_v = 55.0
+ov_distance = 1400.0
 
 focused_planet = -1
 track_angle_h = 0.0
@@ -99,6 +99,9 @@ dimension_shift = False
 # Comet shower: list of active mini-comets
 comet_shower_comets = []
 
+# Explosion particles from planet collisions
+explosion_particles = []
+
 # ============================================================
 # SECTION 4: INIT
 # ============================================================
@@ -109,9 +112,12 @@ def init_universe():
     random.seed(42)
     for p in PLANETS:
         p['orbit_angle'] = random.uniform(0, 360)
+        p['initial_angle'] = p['orbit_angle']          # save for reset
+        p['initial_orbit_radius'] = p['orbit_radius']  # save for reset
         p['eaten'] = False
         for m in p['moons']:
             m['orbit_angle'] = random.uniform(0, 360)
+            m['initial_angle'] = m['orbit_angle']       # save for reset
 
     for _ in range(2000):
         th = random.uniform(0, 2*math.pi)
@@ -202,38 +208,40 @@ def draw_sun():
         gluSphere(quadric, SUN_RADIUS, 20, 20)
 
 def draw_sun_particle_storm():
-    # 300 GL_POINTS orbit very close to the Sun in all directions
-    # Using spherical coordinates seeded by a fixed random set
+    # 300 GL_POINTS hugging the Sun surface - looks like burning plasma
     t = time.time()
-    random.seed(77)  # Fixed seed so positions are stable
-    glPointSize(3)
+    random.seed(77)
+    glPointSize(4)
     glBegin(GL_POINTS)
     for i in range(300):
-        # Each particle gets a fixed spherical position
-        theta = random.uniform(0, 2 * math.pi)   # longitude
-        phi   = random.uniform(0, math.pi)        # latitude
-        # Radial distance from Sun surface - closer = hotter
-        r_base = random.uniform(1.0, 2.8)         # multiplier of SUN_RADIUS
-        
-        # Each particle slowly drifts along its own orbit using time
-        drift = t * random.uniform(0.3, 1.2) + i * 0.47
+        theta = random.uniform(0, 2 * math.pi)
+        phi   = random.uniform(0, math.pi)
+        # Hug the surface: 1.0x to 1.35x Sun radius
+        r_base = random.uniform(1.0, 1.35)
+        drift = t * random.uniform(0.4, 1.5) + i * 0.47
         theta_animated = theta + drift
-        
         r = SUN_RADIUS * r_base
         x = r * math.sin(phi) * math.cos(theta_animated)
         y = r * math.sin(phi) * math.sin(theta_animated)
         z = r * math.cos(phi)
-        
-        # Color: white-yellow near surface, deep orange further out
-        heat = 1.0 - (r_base - 1.0) / 1.8  # 1.0 at surface, 0.0 at edge
-        glColor3f(
-            1.0,                          # always full red
-            0.3 + heat * 0.65,            # green: 0.3 far, 0.95 near
-            heat * 0.4                    # blue: tiny near surface only
-        )
+        # White-hot at surface, bright orange at edge
+        heat = 1.0 - (r_base - 1.0) / 0.35
+        glColor3f(1.0, 0.5 + heat * 0.5, heat * 0.3)
         glVertex3f(x, y, z)
     glEnd()
     glPointSize(2)
+
+def draw_explosions():
+    for p in explosion_particles:
+        life_frac = p['life'] / p['max_life']  # 1.0 fresh, 0.0 dead
+        glPushMatrix()
+        glTranslatef(p['x'], p['y'], p['z'])
+        size = p['size'] * life_frac  # shrink as it fades
+        glScalef(size, size, size)
+        # Color shifts from bright yellow/orange to dark red as it fades
+        glColor3f(1.0, life_frac * 0.8, 0.0)
+        glutSolidCube(1)
+        glPopMatrix()
 
 def draw_comet_shower():
     for c in comet_shower_comets:
@@ -457,8 +465,8 @@ def draw_ufo():
     glPopMatrix()
 
 def draw_wormhole():
-    # Placed far out past Neptune
-    wx, wy, wz = 1000, 800, 0
+    # Just past Neptune (700), directly on the X axis — always visible
+    wx, wy, wz = 850, 0, 0
     glPushMatrix()
     glTranslatef(wx, wy, wz)
     
@@ -767,15 +775,32 @@ def passiveMotionListener(x, y):
 
 def reset_view():
     global cam_mode, focused_planet, ov_angle_h, ov_angle_v, ov_distance
-    global time_scale, paused, scale_mult
+    global time_scale, paused, scale_mult, dimension_shift
+    global comet_shower_comets, explosion_particles, comet_angle, ufo_angle, voyager_angle
+    # Reset camera
     cam_mode = 'overview'
     focused_planet = -1
-    ov_angle_h = 45.0
-    ov_angle_v = 35.0
-    ov_distance = 900.0
+    ov_angle_h = 200.0
+    ov_angle_v = 55.0
+    ov_distance = 1400.0
     time_scale = 1.0
     paused = False
     scale_mult = 1.0
+    # Reset universe state
+    dimension_shift = False
+    comet_shower_comets.clear()
+    explosion_particles.clear()
+    comet_angle = 0.0
+    ufo_angle = 0.0
+    voyager_angle = 0.0
+    # Restore all eaten/moved planets to their exact starting positions
+    for p in PLANETS:
+        p['eaten'] = False
+        p['orbit_angle'] = p['initial_angle']
+        p['self_rot'] = 0.0
+        p['orbit_radius'] = p['initial_orbit_radius']
+        for m in p['moons']:
+            m['orbit_angle'] = m['initial_angle']
 
 # ============================================================
 # SECTION 10: UPDATE & DISPLAY
@@ -796,13 +821,54 @@ def idle():
                 
             # Check if sucked into wormhole
             px, py, pz = get_planet_pos(i)
-            if dist3d((px, py, pz), (1000, 800, 0)) < 250 * scale_mult:
+            if dist3d((px, py, pz), (850, 0, 0)) < 80 * scale_mult:
                 p['eaten'] = True
                 if focused_planet == i: focused_planet = -1
                 if dragging_planet == i: dragging_planet = -1
+        # Check planet-planet collisions
+        alive = [i for i, p in enumerate(PLANETS) if not p.get('eaten', False)]
+        for ai in range(len(alive)):
+            for bi in range(ai+1, len(alive)):
+                i, j = alive[ai], alive[bi]
+                pi = get_planet_pos(i)
+                pj = get_planet_pos(j)
+                min_dist = (PLANETS[i]['radius'] + PLANETS[j]['radius']) * scale_mult * 2.5
+                if dist3d(pi, pj) < min_dist:
+                    # COLLISION! Spawn explosion chunks at midpoint
+                    mx = (pi[0]+pj[0])/2
+                    my = (pi[1]+pj[1])/2
+                    mz = (pi[2]+pj[2])/2
+                    for _ in range(25):
+                        spd = random.uniform(3, 12)
+                        ang = random.uniform(0, 2*math.pi)
+                        elev = random.uniform(-1, 1)
+                        explosion_particles.append({
+                            'x': mx, 'y': my, 'z': mz,
+                            'vx': math.cos(ang)*spd*math.sqrt(1-elev**2),
+                            'vy': math.sin(ang)*spd*math.sqrt(1-elev**2),
+                            'vz': elev*spd,
+                            'size': random.uniform(3, 10),
+                            'life': 60, 'max_life': 60
+                        })
+                    PLANETS[i]['eaten'] = True
+                    PLANETS[j]['eaten'] = True
+                    if focused_planet in (i, j): focused_planet = -1
+                    if dragging_planet in (i, j): dragging_planet = -1
+
+        # Update explosion particles
+        for p in explosion_particles:
+            p['x'] += p['vx']
+            p['y'] += p['vy']
+            p['z'] += p['vz']
+            p['vx'] *= 0.95  # friction
+            p['vy'] *= 0.95
+            p['vz'] *= 0.95
+            p['life'] -= 1
+        explosion_particles[:] = [p for p in explosion_particles if p['life'] > 0]
+
         comet_angle += 1.5 * time_scale * dt * 30
         voyager_angle += 2.5 * time_scale * dt * 30
-        ufo_angle -= 1.0 * time_scale * dt * 30 # Moves backwards!
+        ufo_angle -= 1.0 * time_scale * dt * 30
         
         # Update comet shower
         for c in comet_shower_comets:
@@ -810,7 +876,6 @@ def idle():
             c['y'] += c['vy']
             c['z'] += c['vz']
             c['life'] -= 1
-        # Remove expired comets
         comet_shower_comets[:] = [c for c in comet_shower_comets if c['life'] > 0]
     glutPostRedisplay()
 
@@ -833,6 +898,7 @@ def showScreen():
     draw_asteroid_belt()
     draw_comet()
     draw_comet_shower()
+    draw_explosions()
     draw_ufo()
     draw_wormhole()
     
