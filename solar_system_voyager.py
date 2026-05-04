@@ -397,7 +397,7 @@ def draw_ufo():
 
 def draw_wormhole():
     # Placed far out past Neptune
-    wx, wy, wz = 1000, 800, 100
+    wx, wy, wz = 1000, 800, 0
     glPushMatrix()
     glTranslatef(wx, wy, wz)
     
@@ -614,41 +614,43 @@ def specialKeyListener(key, x, y):
 def mouseListener(button, state, x, y):
     global mouse_left_down, last_mx, last_my, dragging_planet, focused_planet, cam_mode, dimension_shift
     last_mx, last_my = x, y
-    if button == GLUT_LEFT_BUTTON:
+    
+    if button == GLUT_LEFT_BUTTON or button == GLUT_RIGHT_BUTTON:
         if state == GLUT_DOWN:
-            mouse_left_down = True
-            
             # Check if clicked wormhole
             try:
                 mv = glGetDoublev(GL_MODELVIEW_MATRIX)
                 pj = glGetDoublev(GL_PROJECTION_MATRIX)
                 vp = glGetIntegerv(GL_VIEWPORT)
                 wy = vp[3] - y
-                sx, sy, sz = gluProject(1000, 800, 100, mv, pj, vp)
-                if math.sqrt((sx-x)**2 + (sy-wy)**2) < 40:
+                sx, sy, sz = gluProject(1000, 800, 0, mv, pj, vp)
+                if math.sqrt((sx-x)**2 + (sy-wy)**2) < 80: # Increased click radius
                     dimension_shift = not dimension_shift
                     dragging_planet = -1
                     return
             except: pass
 
-            mods = glutGetModifiers()
-            ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
-            hit = pick_planet(x, y)
-            if ctrl_held and hit >= 0:
-                # Ctrl+Click = start dragging planet (no zoom)
-                dragging_planet = hit
-            elif hit >= 0:
-                # Normal click = zoom/focus on planet
+            if button == GLUT_LEFT_BUTTON:
+                mouse_left_down = True
+                mods = glutGetModifiers()
+                ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
+                hit = pick_planet(x, y)
+                if ctrl_held and hit >= 0:
+                    # Ctrl+Click = start dragging planet (no zoom)
+                    dragging_planet = hit
+                elif hit >= 0:
+                    # Normal click = zoom/focus on planet
+                    dragging_planet = -1
+                    focus_on_planet(hit)
+                else:
+                    dragging_planet = -1
+            elif button == GLUT_RIGHT_BUTTON:
+                cam_mode = 'overview'
+                focused_planet = -1
+        else: # GLUT_UP
+            if button == GLUT_LEFT_BUTTON:
+                mouse_left_down = False
                 dragging_planet = -1
-                focus_on_planet(hit)
-            else:
-                dragging_planet = -1
-        else:
-            mouse_left_down = False
-            dragging_planet = -1
-    elif button == GLUT_RIGHT_BUTTON and state == GLUT_DOWN:
-        cam_mode = 'overview'
-        focused_planet = -1
     # Scroll zoom
     if button == 3:
         zoom_camera(-1)
@@ -722,7 +724,7 @@ def idle():
                 
             # Check if sucked into wormhole
             px, py, pz = get_planet_pos(i)
-            if dist3d((px, py, pz), (1000, 800, 100)) < 60 * scale_mult:
+            if dist3d((px, py, pz), (1000, 800, 0)) < 120 * scale_mult:
                 p['eaten'] = True
                 if focused_planet == i: focused_planet = -1
                 if dragging_planet == i: dragging_planet = -1
