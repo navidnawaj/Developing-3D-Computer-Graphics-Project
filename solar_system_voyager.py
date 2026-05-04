@@ -693,6 +693,16 @@ def idle():
         comet_angle += 1.5 * time_scale * dt * 30
         voyager_angle += 2.5 * time_scale * dt * 30
         ufo_angle -= 1.0 * time_scale * dt * 30 # Moves backwards!
+        
+        # Interactive Wormhole Teleport
+        if cam_mode == 'free':
+            wx, wy, wz = 1000, 800, 100
+            if dist3d(free_pos, (wx, wy, wz)) < 60 * scale_mult:
+                ex, ey, ez = get_planet_pos(2) # Earth
+                global free_yaw, free_pitch
+                free_pos[0], free_pos[1], free_pos[2] = ex, ey - 150, ez + 50
+                free_yaw = 90
+                free_pitch = 10
     glutPostRedisplay()
 
 def showScreen():
