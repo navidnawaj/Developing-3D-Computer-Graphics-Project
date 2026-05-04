@@ -91,6 +91,9 @@ stars = []
 asteroids = []
 quadric = None
 
+comet_angle = 0.0
+voyager_angle = 0.0
+
 # ============================================================
 # SECTION 4: INIT
 # ============================================================
@@ -246,6 +249,86 @@ def draw_asteroid_belt():
         glTranslatef(ast[0], ast[1], ast[2])
         glutSolidCube(ast[3])
         glPopMatrix()
+
+def draw_comet():
+    a = 600
+    b = 150
+    rad = math.radians(comet_angle)
+    cx = a * math.cos(rad) - 200
+    cy = b * math.sin(rad)
+    
+    glPushMatrix()
+    glTranslatef(cx, cy, 30)
+    
+    # Head
+    glColor3f(0.5, 0.8, 1.0)
+    gluSphere(quadric, 6 * scale_mult, 10, 10)
+    
+    # Tail (points opposite to velocity vector)
+    vx = -a * math.sin(rad)
+    vy = b * math.cos(rad)
+    mag = math.sqrt(vx*vx + vy*vy)
+    if mag == 0: mag = 1
+    vx, vy = vx/mag, vy/mag
+    
+    for i in range(1, 20):
+        glPushMatrix()
+        dist = i * 4.0 * scale_mult
+        glTranslatef(-vx * dist, -vy * dist, 0)
+        c = max(0.0, 1.0 - i/20.0)
+        glColor3f(c*0.4, c*0.7, c*1.0)
+        glScalef(1 - i/25.0, 1 - i/25.0, 1 - i/25.0)
+        glutSolidCube(3 * scale_mult)
+        glPopMatrix()
+        
+    glPopMatrix()
+
+def draw_voyager(px, py, pz):
+    glPushMatrix()
+    glTranslatef(px, py, pz)
+    
+    # Orbit Earth
+    glRotatef(voyager_angle, 0, 0, 1)
+    glTranslatef(35 * scale_mult, 0, 0)
+    glRotatef(voyager_angle * 2, 1, 1, 0)
+    
+    # Body
+    glColor3f(0.7, 0.7, 0.7)
+    glPushMatrix()
+    glTranslatef(0, 0, -4)
+    gluCylinder(quadric, 2*scale_mult, 2*scale_mult, 8*scale_mult, 10, 1)
+    glPopMatrix()
+    
+    # Dish
+    glColor3f(0.9, 0.9, 0.9)
+    glPushMatrix()
+    glTranslatef(0, 0, 4*scale_mult)
+    glScalef(1, 1, 0.2)
+    gluSphere(quadric, 4*scale_mult, 10, 10)
+    glPopMatrix()
+    
+    # Antenna
+    glColor3f(0.4, 0.4, 0.4)
+    glPushMatrix()
+    glTranslatef(0, 0, 4*scale_mult)
+    gluCylinder(quadric, 0.2*scale_mult, 0.2*scale_mult, 6*scale_mult, 5, 1)
+    glPopMatrix()
+    
+    # Solar Panels
+    glColor3f(0.1, 0.2, 0.5)
+    glPushMatrix()
+    glTranslatef(5*scale_mult, 0, 0)
+    glScalef(6*scale_mult, 2*scale_mult, 0.2*scale_mult)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    glPushMatrix()
+    glTranslatef(-5*scale_mult, 0, 0)
+    glScalef(6*scale_mult, 2*scale_mult, 0.2*scale_mult)
+    glutSolidCube(1)
+    glPopMatrix()
+    
+    glPopMatrix()
 
 def draw_hud():
     # Title
@@ -509,7 +592,7 @@ def reset_view():
 # SECTION 10: UPDATE & DISPLAY
 # ============================================================
 def idle():
-    global last_time
+    global last_time, comet_angle, voyager_angle
     now = time.time()
     dt = now - last_time
     last_time = now
@@ -519,6 +602,8 @@ def idle():
             p['self_rot'] += p['self_rot_spd']*time_scale*dt*30
             for m in p['moons']:
                 m['orbit_angle'] += m['orbit_speed']*time_scale*dt*30
+        comet_angle += 1.5 * time_scale * dt * 30
+        voyager_angle += 2.5 * time_scale * dt * 30
     glutPostRedisplay()
 
 def showScreen():
@@ -536,6 +621,11 @@ def showScreen():
         draw_planet(i)
 
     draw_asteroid_belt()
+    draw_comet()
+    
+    ex, ey, ez = get_planet_pos(2) # Earth is index 2
+    draw_voyager(ex, ey, ez)
+    
     draw_hud()
 
     # Planet name labels in 3D
