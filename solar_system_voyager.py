@@ -201,48 +201,39 @@ def draw_sun():
         glColor3f(1.0, 0.9, 0.0)
         gluSphere(quadric, SUN_RADIUS, 20, 20)
 
-def draw_solar_flares():
-    # Draw 4 animated plasma arcs erupting from the Sun's surface
-    # Each flare uses GL_LINE_STRIP to draw a sine-wave parabolic arc
+def draw_sun_particle_storm():
+    # 300 GL_POINTS orbit very close to the Sun in all directions
+    # Using spherical coordinates seeded by a fixed random set
     t = time.time()
-    flare_configs = [
-        (0,   1.0, 0.8, 0.2, 0.9),   # angle_offset, r, g, b, intensity
-        (90,  1.0, 0.5, 0.1, 0.7),
-        (180, 1.0, 0.7, 0.0, 1.0),
-        (270, 1.0, 0.4, 0.2, 0.6),
-    ]
-    for i, (base_angle, fr, fg, fb, intensity) in enumerate(flare_configs):
-        # Each flare pulses at a slightly different rate
-        pulse = math.sin(t * 1.5 + i * 1.2) * 0.5 + 0.5  # 0.0 to 1.0
-        flare_len = SUN_RADIUS * (1.2 + pulse * 1.8)  # Varies from 1.2x to 3.0x sun radius
-        angle_rad = math.radians(base_angle + math.sin(t * 0.7 + i) * 15)
+    random.seed(77)  # Fixed seed so positions are stable
+    glPointSize(3)
+    glBegin(GL_POINTS)
+    for i in range(300):
+        # Each particle gets a fixed spherical position
+        theta = random.uniform(0, 2 * math.pi)   # longitude
+        phi   = random.uniform(0, math.pi)        # latitude
+        # Radial distance from Sun surface - closer = hotter
+        r_base = random.uniform(1.0, 2.8)         # multiplier of SUN_RADIUS
         
-        # Direction the flare erupts toward
-        dx = math.cos(angle_rad)
-        dy = math.sin(angle_rad)
-        # Perpendicular for the arc width
-        px = -dy
-        py = dx
+        # Each particle slowly drifts along its own orbit using time
+        drift = t * random.uniform(0.3, 1.2) + i * 0.47
+        theta_animated = theta + drift
         
-        glLineWidth(2)
-        glBegin(GL_LINE_STRIP)
-        steps = 20
-        for s in range(steps + 1):
-            frac = s / steps  # 0 to 1
-            # Parabolic rise and fall: height = 4 * frac * (1 - frac)
-            height = flare_len * 4 * frac * (1 - frac)
-            # Base moves outward from sun surface to tip
-            base_dist = SUN_RADIUS + frac * flare_len * 0.5
-            # X,Y from linear progression along direction
-            x = dx * base_dist + px * height * 0.3
-            y = dy * base_dist + py * height * 0.3
-            z = height * 0.15  # slight Z lift
-            # Fade color from bright at base to transparent at tip
-            fade = (1.0 - frac) * intensity * pulse
-            glColor3f(fr * fade, fg * fade * 0.5, fb * fade * 0.1)
-            glVertex3f(x, y, z)
-        glEnd()
-        glLineWidth(1)
+        r = SUN_RADIUS * r_base
+        x = r * math.sin(phi) * math.cos(theta_animated)
+        y = r * math.sin(phi) * math.sin(theta_animated)
+        z = r * math.cos(phi)
+        
+        # Color: white-yellow near surface, deep orange further out
+        heat = 1.0 - (r_base - 1.0) / 1.8  # 1.0 at surface, 0.0 at edge
+        glColor3f(
+            1.0,                          # always full red
+            0.3 + heat * 0.65,            # green: 0.3 far, 0.95 near
+            heat * 0.4                    # blue: tiny near surface only
+        )
+        glVertex3f(x, y, z)
+    glEnd()
+    glPointSize(2)
 
 def draw_comet_shower():
     for c in comet_shower_comets:
@@ -831,7 +822,7 @@ def showScreen():
 
     draw_starfield()
     draw_sun()
-    draw_solar_flares()
+    draw_sun_particle_storm()
 
     for i in range(len(PLANETS)):
         if PLANETS[i].get('eaten', False): continue
