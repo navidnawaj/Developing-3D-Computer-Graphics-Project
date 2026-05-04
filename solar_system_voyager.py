@@ -94,6 +94,7 @@ quadric = None
 comet_angle = 0.0
 voyager_angle = 0.0
 ufo_angle = 0.0
+dimension_shift = False
 
 # ============================================================
 # SECTION 4: INIT
@@ -105,6 +106,7 @@ def init_universe():
     random.seed(42)
     for p in PLANETS:
         p['orbit_angle'] = random.uniform(0, 360)
+        p['eaten'] = False
         for m in p['moons']:
             m['orbit_angle'] = random.uniform(0, 360)
 
@@ -174,17 +176,27 @@ def draw_starfield():
     glPointSize(2)
     glBegin(GL_POINTS)
     for s in stars:
-        glColor3f(s[3], s[3], s[3]*0.9)
+        if dimension_shift:
+            glColor3f(s[3], s[3]*0.2, s[3]*0.2)
+        else:
+            glColor3f(s[3], s[3], s[3]*0.9)
         glVertex3f(s[0], s[1], s[2])
     glEnd()
 
 def draw_sun():
-    # Outer glow
-    glColor3f(1.0, 0.4, 0.0)
-    gluSphere(quadric, SUN_RADIUS*1.15, 20, 20)
-    # Main body
-    glColor3f(1.0, 0.9, 0.0)
-    gluSphere(quadric, SUN_RADIUS, 20, 20)
+    if dimension_shift:
+        # Blue Giant
+        glColor3f(0.1, 0.4, 1.0)
+        gluSphere(quadric, SUN_RADIUS*1.2, 20, 20)
+        glColor3f(0.3, 0.8, 1.0)
+        gluSphere(quadric, SUN_RADIUS*1.05, 20, 20)
+    else:
+        # Outer glow
+        glColor3f(1.0, 0.4, 0.0)
+        gluSphere(quadric, SUN_RADIUS*1.15, 20, 20)
+        # Main body
+        glColor3f(1.0, 0.9, 0.0)
+        gluSphere(quadric, SUN_RADIUS, 20, 20)
 
 def draw_orbit_path(radius):
     glColor3f(0.25, 0.25, 0.4)
@@ -212,6 +224,7 @@ def draw_saturn_rings(pr):
 
 def draw_planet(idx):
     p = PLANETS[idx]
+    if p.get('eaten', False): return
     glPushMatrix()
     glRotatef(p['orbit_angle'], 0, 0, 1)
     glTranslatef(p['orbit_radius'], 0, 0)
@@ -599,11 +612,25 @@ def specialKeyListener(key, x, y):
         if key == GLUT_KEY_DOWN: free_pitch = max(-89, free_pitch-3)
 
 def mouseListener(button, state, x, y):
-    global mouse_left_down, last_mx, last_my, dragging_planet, focused_planet, cam_mode
+    global mouse_left_down, last_mx, last_my, dragging_planet, focused_planet, cam_mode, dimension_shift
     last_mx, last_my = x, y
     if button == GLUT_LEFT_BUTTON:
         if state == GLUT_DOWN:
             mouse_left_down = True
+            
+            # Check if clicked wormhole
+            try:
+                mv = glGetDoublev(GL_MODELVIEW_MATRIX)
+                pj = glGetDoublev(GL_PROJECTION_MATRIX)
+                vp = glGetIntegerv(GL_VIEWPORT)
+                wy = vp[3] - y
+                sx, sy, sz = gluProject(1000, 800, 100, mv, pj, vp)
+                if math.sqrt((sx-x)**2 + (sy-wy)**2) < 40:
+                    dimension_shift = not dimension_shift
+                    dragging_planet = -1
+                    return
+            except: pass
+
             mods = glutGetModifiers()
             ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
             hit = pick_planet(x, y)
@@ -680,29 +707,28 @@ def reset_view():
 # SECTION 10: UPDATE & DISPLAY
 # ============================================================
 def idle():
-    global last_time, comet_angle, voyager_angle, ufo_angle
+    global last_time, comet_angle, voyager_angle, ufo_angle, focused_planet, dragging_planet
     now = time.time()
     dt = now - last_time
     last_time = now
     if not paused:
-        for p in PLANETS:
-            p['orbit_angle'] += p['orbit_speed']*time_scale*dt*30
+        speed_mult = -1.0 if dimension_shift else 1.0
+        for i, p in enumerate(PLANETS):
+            if p.get('eaten', False): continue
+            p['orbit_angle'] += p['orbit_speed']*time_scale*dt*30 * speed_mult
             p['self_rot'] += p['self_rot_spd']*time_scale*dt*30
             for m in p['moons']:
-                m['orbit_angle'] += m['orbit_speed']*time_scale*dt*30
+                m['orbit_angle'] += m['orbit_speed']*time_scale*dt*30 * speed_mult
+                
+            # Check if sucked into wormhole
+            px, py, pz = get_planet_pos(i)
+            if dist3d((px, py, pz), (1000, 800, 100)) < 60 * scale_mult:
+                p['eaten'] = True
+                if focused_planet == i: focused_planet = -1
+                if dragging_planet == i: dragging_planet = -1
         comet_angle += 1.5 * time_scale * dt * 30
         voyager_angle += 2.5 * time_scale * dt * 30
         ufo_angle -= 1.0 * time_scale * dt * 30 # Moves backwards!
-        
-        # Interactive Wormhole Teleport
-        if cam_mode == 'free':
-            wx, wy, wz = 1000, 800, 100
-            if dist3d(free_pos, (wx, wy, wz)) < 60 * scale_mult:
-                ex, ey, ez = get_planet_pos(2) # Earth
-                global free_yaw, free_pitch
-                free_pos[0], free_pos[1], free_pos[2] = ex, ey - 150, ez + 50
-                free_yaw = 90
-                free_pitch = 10
     glutPostRedisplay()
 
 def showScreen():
@@ -715,6 +741,7 @@ def showScreen():
     draw_sun()
 
     for i in range(len(PLANETS)):
+        if PLANETS[i].get('eaten', False): continue
         if show_orbits or focused_planet == i:
             draw_orbit_path(PLANETS[i]['orbit_radius'])
         draw_planet(i)
@@ -732,6 +759,7 @@ def showScreen():
     # Planet name labels in 3D
     if show_labels:
         for i, p in enumerate(PLANETS):
+            if p.get('eaten', False): continue
             px, py, pz = get_planet_pos(i)
             glPushMatrix()
             glTranslatef(px, py, p['radius']*scale_mult+8)
