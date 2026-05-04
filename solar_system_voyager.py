@@ -382,6 +382,86 @@ def draw_ufo():
     
     glPopMatrix()
 
+def draw_dyson_sphere():
+    # A mega-structure wireframe around the Sun
+    glPushMatrix()
+    glRotatef(time.time() * 5, 0, 1, 1) # Slow complex rotation
+    glColor3f(0.3, 0.5, 0.8) # Metallic blue
+    
+    # Draw longitude rings
+    for i in range(6):
+        glPushMatrix()
+        glRotatef(i * 30, 0, 1, 0)
+        glBegin(GL_LINE_LOOP)
+        for j in range(60):
+            a = math.radians(j * 6)
+            r = SUN_RADIUS * 1.8
+            glVertex3f(r * math.cos(a), r * math.sin(a), 0)
+        glEnd()
+        glPopMatrix()
+        
+    # Draw latitude rings
+    for i in range(1, 4):
+        glPushMatrix()
+        z_offset = (i - 2) * SUN_RADIUS * 0.8
+        r = math.sqrt((SUN_RADIUS * 1.8)**2 - z_offset**2)
+        glTranslatef(0, 0, z_offset)
+        glBegin(GL_LINE_LOOP)
+        for j in range(60):
+            a = math.radians(j * 6)
+            glVertex3f(r * math.cos(a), r * math.sin(a), 0)
+        glEnd()
+        glPopMatrix()
+        
+    # Add a few solid solar panels at intersections
+    for i in range(4):
+        glPushMatrix()
+        glRotatef(i * 90 + time.time() * 10, 1, 0, 0)
+        glTranslatef(0, SUN_RADIUS * 1.8, 0)
+        glScalef(8, 2, 8)
+        glColor3f(0.1, 0.2, 0.4) # Dark blue panels
+        glutSolidCube(1)
+        glPopMatrix()
+        
+    glPopMatrix()
+
+def draw_wormhole():
+    # Placed far out past Neptune
+    wx, wy, wz = 1000, 800, 100
+    glPushMatrix()
+    glTranslatef(wx, wy, wz)
+    
+    # Tilt the wormhole to face the inner system somewhat
+    glRotatef(45, 1, 1, 0)
+    
+    # The event horizon (Black sphere)
+    glColor3f(0.0, 0.0, 0.0)
+    gluSphere(quadric, 35 * scale_mult, 20, 20)
+    
+    # Accretion disk (swirling particles)
+    glPointSize(3)
+    glBegin(GL_POINTS)
+    for i in range(400):
+        # Random distance from center
+        dist = 40 * scale_mult + (i % 80) * 1.5 * scale_mult
+        # Speed increases closer to the center
+        speed = 200.0 / dist
+        angle = math.radians((i * 13.7) + (time.time() * speed * 20))
+        
+        # Color gradient: Purple on outside, bright cyan on inside
+        blend = min(1.0, (dist - 40 * scale_mult) / (120 * scale_mult))
+        glColor3f(0.2 + (1-blend)*0.8, 0.1 + blend*0.4, 0.8 + (1-blend)*0.2)
+        
+        x = dist * math.cos(angle)
+        y = dist * math.sin(angle)
+        # Slight thickness to the disk
+        z = 4 * scale_mult * math.sin(i * 2.3 + time.time() * 2)
+        glVertex3f(x, y, z)
+    glEnd()
+    glPointSize(2) # reset point size
+    
+    glPopMatrix()
+
 def draw_hud():
     # Title
     draw_text(10, W_HEIGHT-30, "3D Solar System Voyager")
@@ -492,8 +572,7 @@ def keyboardListener(key, x, y):
     if key in [b'1',b'2',b'3',b'4',b'5',b'6',b'7',b'8']:
         focus_on_planet(int(key)-1)
     elif key == b'0':
-        cam_mode = 'overview'
-        focused_planet = -1
+        reset_view()
     elif key == b'f' or key == b'F':
         if cam_mode != 'free':
             cam_mode = 'free'
@@ -667,6 +746,7 @@ def showScreen():
 
     draw_starfield()
     draw_sun()
+    draw_dyson_sphere()
 
     for i in range(len(PLANETS)):
         if show_orbits or focused_planet == i:
@@ -676,6 +756,7 @@ def showScreen():
     draw_asteroid_belt()
     draw_comet()
     draw_ufo()
+    draw_wormhole()
     
     ex, ey, ez = get_planet_pos(2) # Earth is index 2
     draw_voyager(ex, ey, ez)
