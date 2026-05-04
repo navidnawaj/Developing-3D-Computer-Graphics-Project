@@ -444,7 +444,7 @@ def draw_hud():
     draw_small_text(10, 95, "[1-8] Focus Planet  [0] Overview  [F] Free-roam")
     draw_small_text(10, 75, "[SPACE] Pause  [/] Speed  [O] Orbits  [T] Scale x10")
     draw_small_text(10, 55, "[Arrows] Camera  [+/-] Zoom  [Click] Select")
-    draw_small_text(10, 35, "[Ctrl+Drag] Move Planet  [WASD] Fly  [R] Reset")
+    draw_small_text(10, 35, "[Ctrl+Drag] Move  [WASD] Fly  [X] Dim-Shift")
 
     # Focused planet info
     if 0 <= focused_planet < len(PLANETS):
@@ -566,6 +566,9 @@ def keyboardListener(key, x, y):
         zoom_camera(1)
     elif key == b'r' or key == b'R':
         reset_view()
+    elif key == b'x' or key == b'X':
+        global dimension_shift
+        dimension_shift = not dimension_shift
     # Free-roam WASD
     if cam_mode == 'free':
         spd = 15.0
@@ -615,42 +618,27 @@ def mouseListener(button, state, x, y):
     global mouse_left_down, last_mx, last_my, dragging_planet, focused_planet, cam_mode, dimension_shift
     last_mx, last_my = x, y
     
-    if button == GLUT_LEFT_BUTTON or button == GLUT_RIGHT_BUTTON:
+    if button == GLUT_LEFT_BUTTON:
         if state == GLUT_DOWN:
-            # Check if clicked wormhole
-            try:
-                mv = glGetDoublev(GL_MODELVIEW_MATRIX)
-                pj = glGetDoublev(GL_PROJECTION_MATRIX)
-                vp = glGetIntegerv(GL_VIEWPORT)
-                wy = vp[3] - y
-                sx, sy, sz = gluProject(1000, 800, 0, mv, pj, vp)
-                if math.sqrt((sx-x)**2 + (sy-wy)**2) < 80: # Increased click radius
-                    dimension_shift = not dimension_shift
-                    dragging_planet = -1
-                    return
-            except: pass
-
-            if button == GLUT_LEFT_BUTTON:
-                mouse_left_down = True
-                mods = glutGetModifiers()
-                ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
-                hit = pick_planet(x, y)
-                if ctrl_held and hit >= 0:
-                    # Ctrl+Click = start dragging planet (no zoom)
-                    dragging_planet = hit
-                elif hit >= 0:
-                    # Normal click = zoom/focus on planet
-                    dragging_planet = -1
-                    focus_on_planet(hit)
-                else:
-                    dragging_planet = -1
-            elif button == GLUT_RIGHT_BUTTON:
-                cam_mode = 'overview'
-                focused_planet = -1
-        else: # GLUT_UP
-            if button == GLUT_LEFT_BUTTON:
-                mouse_left_down = False
+            mouse_left_down = True
+            mods = glutGetModifiers()
+            ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
+            hit = pick_planet(x, y)
+            if ctrl_held and hit >= 0:
+                # Ctrl+Click = start dragging planet (no zoom)
+                dragging_planet = hit
+            elif hit >= 0:
+                # Normal click = zoom/focus on planet
                 dragging_planet = -1
+                focus_on_planet(hit)
+            else:
+                dragging_planet = -1
+        else: # GLUT_UP
+            mouse_left_down = False
+            dragging_planet = -1
+    elif button == GLUT_RIGHT_BUTTON and state == GLUT_DOWN:
+        cam_mode = 'overview'
+        focused_planet = -1
     # Scroll zoom
     if button == 3:
         zoom_camera(-1)
@@ -724,7 +712,7 @@ def idle():
                 
             # Check if sucked into wormhole
             px, py, pz = get_planet_pos(i)
-            if dist3d((px, py, pz), (1000, 800, 0)) < 120 * scale_mult:
+            if dist3d((px, py, pz), (1000, 800, 0)) < 250 * scale_mult:
                 p['eaten'] = True
                 if focused_planet == i: focused_planet = -1
                 if dragging_planet == i: dragging_planet = -1
