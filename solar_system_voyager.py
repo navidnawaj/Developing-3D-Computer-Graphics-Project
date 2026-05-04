@@ -93,6 +93,7 @@ quadric = None
 
 comet_angle = 0.0
 voyager_angle = 0.0
+ufo_angle = 0.0
 
 # ============================================================
 # SECTION 4: INIT
@@ -326,6 +327,57 @@ def draw_voyager(px, py, pz):
     glTranslatef(-5*scale_mult, 0, 0)
     glScalef(6*scale_mult, 2*scale_mult, 0.2*scale_mult)
     glutSolidCube(1)
+    glPopMatrix()
+    
+    glPopMatrix()
+
+def draw_ufo():
+    # Orbiting in the asteroid belt
+    rad = math.radians(ufo_angle)
+    # Give it a wobbly orbit
+    orbit_rad = 310 + 20 * math.sin(time.time() * 2)
+    cx = orbit_rad * math.cos(rad)
+    cy = orbit_rad * math.sin(rad)
+    cz = 15 * math.sin(time.time() * 3) # Bobbing up and down
+    
+    glPushMatrix()
+    glTranslatef(cx, cy, cz)
+    
+    # Tilt it slightly towards movement
+    glRotatef(20 * math.sin(time.time() * 4), 1, 1, 0)
+    
+    # Saucer Body
+    glColor3f(0.2, 0.8, 0.3) # Alien green
+    glPushMatrix()
+    glScalef(2 * scale_mult, 2 * scale_mult, 0.4 * scale_mult)
+    gluSphere(quadric, 4, 20, 20)
+    glPopMatrix()
+    
+    # Glass Dome
+    glColor3f(0.6, 0.9, 1.0) # Light blue glass
+    glPushMatrix()
+    glTranslatef(0, 0, 1.5 * scale_mult)
+    glScalef(1.2 * scale_mult, 1.2 * scale_mult, 1.2 * scale_mult)
+    gluSphere(quadric, 2, 16, 16)
+    glPopMatrix()
+    
+    # Blinking Lights around the rim
+    glPushMatrix()
+    glRotatef(time.time() * 100, 0, 0, 1) # Spin the lights
+    for i in range(8):
+        glPushMatrix()
+        angle = (360.0 / 8) * i
+        glRotatef(angle, 0, 0, 1)
+        glTranslatef(7.5 * scale_mult, 0, 0)
+        
+        # Blink effect
+        if int(time.time() * 5 + i) % 2 == 0:
+            glColor3f(1.0, 0.1, 0.1) # Red light
+        else:
+            glColor3f(1.0, 1.0, 0.0) # Yellow light
+            
+        glutSolidCube(1 * scale_mult)
+        glPopMatrix()
     glPopMatrix()
     
     glPopMatrix()
@@ -592,7 +644,7 @@ def reset_view():
 # SECTION 10: UPDATE & DISPLAY
 # ============================================================
 def idle():
-    global last_time, comet_angle, voyager_angle
+    global last_time, comet_angle, voyager_angle, ufo_angle
     now = time.time()
     dt = now - last_time
     last_time = now
@@ -604,6 +656,7 @@ def idle():
                 m['orbit_angle'] += m['orbit_speed']*time_scale*dt*30
         comet_angle += 1.5 * time_scale * dt * 30
         voyager_angle += 2.5 * time_scale * dt * 30
+        ufo_angle -= 1.0 * time_scale * dt * 30 # Moves backwards!
     glutPostRedisplay()
 
 def showScreen():
@@ -622,6 +675,7 @@ def showScreen():
 
     draw_asteroid_belt()
     draw_comet()
+    draw_ufo()
     
     ex, ey, ez = get_planet_pos(2) # Earth is index 2
     draw_voyager(ex, ey, ez)
