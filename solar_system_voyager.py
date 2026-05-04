@@ -96,6 +96,9 @@ voyager_angle = 0.0
 ufo_angle = 0.0
 dimension_shift = False
 
+# Comet shower: list of active mini-comets
+comet_shower_comets = []
+
 # ============================================================
 # SECTION 4: INIT
 # ============================================================
@@ -197,6 +200,73 @@ def draw_sun():
         # Main body
         glColor3f(1.0, 0.9, 0.0)
         gluSphere(quadric, SUN_RADIUS, 20, 20)
+
+def draw_solar_flares():
+    # Draw 4 animated plasma arcs erupting from the Sun's surface
+    # Each flare uses GL_LINE_STRIP to draw a sine-wave parabolic arc
+    t = time.time()
+    flare_configs = [
+        (0,   1.0, 0.8, 0.2, 0.9),   # angle_offset, r, g, b, intensity
+        (90,  1.0, 0.5, 0.1, 0.7),
+        (180, 1.0, 0.7, 0.0, 1.0),
+        (270, 1.0, 0.4, 0.2, 0.6),
+    ]
+    for i, (base_angle, fr, fg, fb, intensity) in enumerate(flare_configs):
+        # Each flare pulses at a slightly different rate
+        pulse = math.sin(t * 1.5 + i * 1.2) * 0.5 + 0.5  # 0.0 to 1.0
+        flare_len = SUN_RADIUS * (1.2 + pulse * 1.8)  # Varies from 1.2x to 3.0x sun radius
+        angle_rad = math.radians(base_angle + math.sin(t * 0.7 + i) * 15)
+        
+        # Direction the flare erupts toward
+        dx = math.cos(angle_rad)
+        dy = math.sin(angle_rad)
+        # Perpendicular for the arc width
+        px = -dy
+        py = dx
+        
+        glLineWidth(2)
+        glBegin(GL_LINE_STRIP)
+        steps = 20
+        for s in range(steps + 1):
+            frac = s / steps  # 0 to 1
+            # Parabolic rise and fall: height = 4 * frac * (1 - frac)
+            height = flare_len * 4 * frac * (1 - frac)
+            # Base moves outward from sun surface to tip
+            base_dist = SUN_RADIUS + frac * flare_len * 0.5
+            # X,Y from linear progression along direction
+            x = dx * base_dist + px * height * 0.3
+            y = dy * base_dist + py * height * 0.3
+            z = height * 0.15  # slight Z lift
+            # Fade color from bright at base to transparent at tip
+            fade = (1.0 - frac) * intensity * pulse
+            glColor3f(fr * fade, fg * fade * 0.5, fb * fade * 0.1)
+            glVertex3f(x, y, z)
+        glEnd()
+        glLineWidth(1)
+
+def draw_comet_shower():
+    for c in comet_shower_comets:
+        cx, cy, cz = c['x'], c['y'], c['z']
+        vx, vy, vz = c['vx'], c['vy'], c['vz']
+        # Draw glowing head
+        glPushMatrix()
+        glTranslatef(cx, cy, cz)
+        glColor3f(0.9, 0.95, 1.0)
+        gluSphere(quadric, 4, 8, 8)
+        glPopMatrix()
+        # Draw trail of cubes fading behind
+        trail_len = 12
+        for k in range(1, trail_len):
+            fade = (trail_len - k) / trail_len
+            tx = cx - vx * k * 2.5
+            ty = cy - vy * k * 2.5
+            tz = cz - vz * k * 2.5
+            glPushMatrix()
+            glTranslatef(tx, ty, tz)
+            glColor3f(0.5 * fade, 0.6 * fade, 1.0 * fade)
+            glScalef(fade, fade, fade)
+            glutSolidCube(3)
+            glPopMatrix()
 
 def draw_orbit_path(radius):
     glColor3f(0.25, 0.25, 0.4)
@@ -444,7 +514,7 @@ def draw_hud():
     draw_small_text(10, 95, "[1-8] Focus Planet  [0] Overview  [F] Free-roam")
     draw_small_text(10, 75, "[SPACE] Pause  [/] Speed  [O] Orbits  [T] Scale x10")
     draw_small_text(10, 55, "[Arrows] Camera  [+/-] Zoom  [Click] Select")
-    draw_small_text(10, 35, "[Ctrl+Drag] Move  [WASD] Fly  [X] Dim-Shift")
+    draw_small_text(10, 35, "[Ctrl+Drag] Move  [C] Comet Shower  [X] Dim-Shift")
 
     # Focused planet info
     if 0 <= focused_planet < len(PLANETS):
@@ -569,6 +639,29 @@ def keyboardListener(key, x, y):
     elif key == b'x' or key == b'X':
         global dimension_shift
         dimension_shift = not dimension_shift
+    elif key == b'c' or key == b'C':
+        # Trigger a comet shower - spawn 10 mini-comets
+        random.seed(int(time.time()*1000) % 99999)
+        for _ in range(10):
+            # Spawn from random direction far from center
+            ang = random.uniform(0, 2*math.pi)
+            dist = random.uniform(600, 900)
+            sx = math.cos(ang) * dist
+            sy = math.sin(ang) * dist
+            sz = random.uniform(-100, 100)
+            # Velocity aimed roughly toward center with some spread
+            speed = random.uniform(8, 16)
+            to_cx = -sx + random.uniform(-80, 80)
+            to_cy = -sy + random.uniform(-80, 80)
+            to_cz = -sz * 0.5
+            mag = math.sqrt(to_cx**2 + to_cy**2 + to_cz**2)
+            comet_shower_comets.append({
+                'x': sx, 'y': sy, 'z': sz,
+                'vx': to_cx/mag * speed,
+                'vy': to_cy/mag * speed,
+                'vz': to_cz/mag * speed,
+                'life': 120  # frames until it expires
+            })
     # Free-roam WASD
     if cam_mode == 'free':
         spd = 15.0
@@ -719,6 +812,15 @@ def idle():
         comet_angle += 1.5 * time_scale * dt * 30
         voyager_angle += 2.5 * time_scale * dt * 30
         ufo_angle -= 1.0 * time_scale * dt * 30 # Moves backwards!
+        
+        # Update comet shower
+        for c in comet_shower_comets:
+            c['x'] += c['vx']
+            c['y'] += c['vy']
+            c['z'] += c['vz']
+            c['life'] -= 1
+        # Remove expired comets
+        comet_shower_comets[:] = [c for c in comet_shower_comets if c['life'] > 0]
     glutPostRedisplay()
 
 def showScreen():
@@ -729,6 +831,7 @@ def showScreen():
 
     draw_starfield()
     draw_sun()
+    draw_solar_flares()
 
     for i in range(len(PLANETS)):
         if PLANETS[i].get('eaten', False): continue
@@ -738,6 +841,7 @@ def showScreen():
 
     draw_asteroid_belt()
     draw_comet()
+    draw_comet_shower()
     draw_ufo()
     draw_wormhole()
     
