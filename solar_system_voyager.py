@@ -382,49 +382,6 @@ def draw_ufo():
     
     glPopMatrix()
 
-def draw_dyson_sphere():
-    # A mega-structure wireframe around the Sun
-    glPushMatrix()
-    glRotatef(time.time() * 5, 0, 1, 1) # Slow complex rotation
-    glColor3f(0.3, 0.5, 0.8) # Metallic blue
-    
-    # Draw longitude rings
-    for i in range(6):
-        glPushMatrix()
-        glRotatef(i * 30, 0, 1, 0)
-        glBegin(GL_LINE_LOOP)
-        for j in range(60):
-            a = math.radians(j * 6)
-            r = SUN_RADIUS * 1.8
-            glVertex3f(r * math.cos(a), r * math.sin(a), 0)
-        glEnd()
-        glPopMatrix()
-        
-    # Draw latitude rings
-    for i in range(1, 4):
-        glPushMatrix()
-        z_offset = (i - 2) * SUN_RADIUS * 0.8
-        r = math.sqrt((SUN_RADIUS * 1.8)**2 - z_offset**2)
-        glTranslatef(0, 0, z_offset)
-        glBegin(GL_LINE_LOOP)
-        for j in range(60):
-            a = math.radians(j * 6)
-            glVertex3f(r * math.cos(a), r * math.sin(a), 0)
-        glEnd()
-        glPopMatrix()
-        
-    # Add a few solid solar panels at intersections
-    for i in range(4):
-        glPushMatrix()
-        glRotatef(i * 90 + time.time() * 10, 1, 0, 0)
-        glTranslatef(0, SUN_RADIUS * 1.8, 0)
-        glScalef(8, 2, 8)
-        glColor3f(0.1, 0.2, 0.4) # Dark blue panels
-        glutSolidCube(1)
-        glPopMatrix()
-        
-    glPopMatrix()
-
 def draw_wormhole():
     # Placed far out past Neptune
     wx, wy, wz = 1000, 800, 100
@@ -746,7 +703,6 @@ def showScreen():
 
     draw_starfield()
     draw_sun()
-    draw_dyson_sphere()
 
     for i in range(len(PLANETS)):
         if show_orbits or focused_planet == i:
