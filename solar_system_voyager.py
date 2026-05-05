@@ -112,14 +112,14 @@ def init_universe():
     random.seed(42)
     for p in PLANETS:
         p['orbit_angle'] = random.uniform(0, 360)
-        p['initial_angle'] = p['orbit_angle']          # save for reset
-        p['initial_orbit_radius'] = p['orbit_radius']  # save for reset
+        p['initial_angle'] = p['orbit_angle']
+        p['initial_orbit_radius'] = p['orbit_radius']
         p['eaten'] = False
         for m in p['moons']:
             m['orbit_angle'] = random.uniform(0, 360)
-            m['initial_angle'] = m['orbit_angle']       # save for reset
+            m['initial_angle'] = m['orbit_angle']
 
-    for _ in range(2000):
+    for _ in range(5000):
         th = random.uniform(0, 2*math.pi)
         ph = random.uniform(-math.pi/2, math.pi/2)
         r = 2500
@@ -208,7 +208,7 @@ def draw_sun():
         gluSphere(quadric, SUN_RADIUS, 20, 20)
 
 def draw_sun_particle_storm():
-    # 300 GL_POINTS hugging the Sun surface - looks like burning plasma
+    # 300 GL_POINTS
     t = time.time()
     random.seed(77)
     glPointSize(4)
@@ -216,7 +216,6 @@ def draw_sun_particle_storm():
     for i in range(300):
         theta = random.uniform(0, 2 * math.pi)
         phi   = random.uniform(0, math.pi)
-        # Hug the surface: 1.0x to 1.35x Sun radius
         r_base = random.uniform(1.0, 1.35)
         drift = t * random.uniform(0.4, 1.5) + i * 0.47
         theta_animated = theta + drift
@@ -224,7 +223,6 @@ def draw_sun_particle_storm():
         x = r * math.sin(phi) * math.cos(theta_animated)
         y = r * math.sin(phi) * math.sin(theta_animated)
         z = r * math.cos(phi)
-        # White-hot at surface, bright orange at edge
         heat = 1.0 - (r_base - 1.0) / 0.35
         glColor3f(1.0, 0.5 + heat * 0.5, heat * 0.3)
         glVertex3f(x, y, z)
@@ -233,12 +231,11 @@ def draw_sun_particle_storm():
 
 def draw_explosions():
     for p in explosion_particles:
-        life_frac = p['life'] / p['max_life']  # 1.0 fresh, 0.0 dead
+        life_frac = p['life'] / p['max_life']
         glPushMatrix()
         glTranslatef(p['x'], p['y'], p['z'])
-        size = p['size'] * life_frac  # shrink as it fades
+        size = p['size'] * life_frac
         glScalef(size, size, size)
-        # Color shifts from bright yellow/orange to dark red as it fades
         glColor3f(1.0, life_frac * 0.8, 0.0)
         glutSolidCube(1)
         glPopMatrix()
@@ -247,13 +244,11 @@ def draw_comet_shower():
     for c in comet_shower_comets:
         cx, cy, cz = c['x'], c['y'], c['z']
         vx, vy, vz = c['vx'], c['vy'], c['vz']
-        # Draw glowing head
         glPushMatrix()
         glTranslatef(cx, cy, cz)
         glColor3f(0.9, 0.95, 1.0)
         gluSphere(quadric, 4, 8, 8)
         glPopMatrix()
-        # Draw trail of cubes fading behind
         trail_len = 12
         for k in range(1, trail_len):
             fade = (trail_len - k) / trail_len
@@ -269,7 +264,7 @@ def draw_comet_shower():
 
 def draw_orbit_path(radius):
     glColor3f(0.25, 0.25, 0.4)
-    glBegin(GL_LINE_LOOP)
+    glBegin(GL_POINTS)
     for i in range(200):
         a = 2.0*math.pi*i/200
         glVertex3f(radius*math.cos(a), radius*math.sin(a), 0)
@@ -284,11 +279,14 @@ def draw_saturn_rings(pr):
         outer = r1 + (ring+1)*(r2-r1)/3
         c = 0.85 - ring*0.1
         glColor3f(c, c*0.85, c*0.6)
-        glBegin(GL_QUAD_STRIP)
-        for i in range(segments+1):
-            a = 2.0*math.pi*i/segments
-            glVertex3f(inner*math.cos(a), inner*math.sin(a), 0)
-            glVertex3f(outer*math.cos(a), outer*math.sin(a), 0)
+        glBegin(GL_QUADS)
+        for i in range(segments):
+            a1 = 2.0*math.pi*i/segments
+            a2 = 2.0*math.pi*(i+1)/segments
+            glVertex3f(inner*math.cos(a1), inner*math.sin(a1), 0)
+            glVertex3f(outer*math.cos(a1), outer*math.sin(a1), 0)
+            glVertex3f(outer*math.cos(a2), outer*math.sin(a2), 0)
+            glVertex3f(inner*math.cos(a2), inner*math.sin(a2), 0)
         glEnd()
 
 def draw_planet(idx):
@@ -314,12 +312,11 @@ def draw_planet(idx):
         glColor3f(*m['color'])
         gluSphere(quadric, m['radius']*scale_mult, 10, 10)
         glPopMatrix()
-        # Moon orbit path
         if show_orbits and (focused_planet == idx):
             glColor3f(0.3, 0.3, 0.3)
-            glBegin(GL_LINE_LOOP)
-            for i in range(80):
-                a = 2.0*math.pi*i/80
+            glBegin(GL_POINTS)
+            for i in range(400):
+                a = 2.0*math.pi*i/400
                 mr = m['orbit_radius']*scale_mult
                 glVertex3f(mr*math.cos(a), mr*math.sin(a), 0)
             glEnd()
@@ -343,11 +340,9 @@ def draw_comet():
     glPushMatrix()
     glTranslatef(cx, cy, 30)
     
-    # Head
     glColor3f(0.5, 0.8, 1.0)
     gluSphere(quadric, 6 * scale_mult, 10, 10)
     
-    # Tail (points opposite to velocity vector)
     vx = -a * math.sin(rad)
     vy = b * math.cos(rad)
     mag = math.sqrt(vx*vx + vy*vy)
@@ -414,29 +409,26 @@ def draw_voyager(px, py, pz):
     glPopMatrix()
 
 def draw_ufo():
-    # Orbiting in the asteroid belt
     rad = math.radians(ufo_angle)
-    # Give it a wobbly orbit
     orbit_rad = 310 + 20 * math.sin(time.time() * 2)
     cx = orbit_rad * math.cos(rad)
     cy = orbit_rad * math.sin(rad)
-    cz = 15 * math.sin(time.time() * 3) # Bobbing up and down
+    cz = 15 * math.sin(time.time() * 3)
     
     glPushMatrix()
     glTranslatef(cx, cy, cz)
     
-    # Tilt it slightly towards movement
     glRotatef(20 * math.sin(time.time() * 4), 1, 1, 0)
     
     # Saucer Body
-    glColor3f(0.2, 0.8, 0.3) # Alien green
+    glColor3f(0.2, 0.8, 0.3)
     glPushMatrix()
     glScalef(2 * scale_mult, 2 * scale_mult, 0.4 * scale_mult)
     gluSphere(quadric, 4, 20, 20)
     glPopMatrix()
     
     # Glass Dome
-    glColor3f(0.6, 0.9, 1.0) # Light blue glass
+    glColor3f(0.6, 0.9, 1.0)
     glPushMatrix()
     glTranslatef(0, 0, 1.5 * scale_mult)
     glScalef(1.2 * scale_mult, 1.2 * scale_mult, 1.2 * scale_mult)
@@ -445,39 +437,37 @@ def draw_ufo():
     
     # Blinking Lights around the rim
     glPushMatrix()
-    glRotatef(time.time() * 100, 0, 0, 1) # Spin the lights
+    glRotatef(time.time() * 100, 0, 0, 1)
     for i in range(8):
         glPushMatrix()
         angle = (360.0 / 8) * i
         glRotatef(angle, 0, 0, 1)
-        glTranslatef(7.5 * scale_mult, 0, 0)
+        glTranslatef(8.5 * scale_mult, 0, 0)
         
-        # Blink effect
         if int(time.time() * 5 + i) % 2 == 0:
-            glColor3f(1.0, 0.1, 0.1) # Red light
+            glColor3f(1.0, 0.1, 0.1)
         else:
-            glColor3f(1.0, 1.0, 0.0) # Yellow light
+            glColor3f(1.0, 1.0, 0.0)
             
-        glutSolidCube(1 * scale_mult)
+        glutSolidCube(2 * scale_mult)
         glPopMatrix()
     glPopMatrix()
     
     glPopMatrix()
 
 def draw_wormhole():
-    # Just past Neptune (700), directly on the X axis — always visible
     wx, wy, wz = 850, 0, 0
     glPushMatrix()
     glTranslatef(wx, wy, wz)
     
-    # Tilt the wormhole to face the inner system somewhat
+    #Tilt
     glRotatef(45, 1, 1, 0)
     
-    # The event horizon (Black sphere)
+    #Black sphere
     glColor3f(0.0, 0.0, 0.0)
     gluSphere(quadric, 35 * scale_mult, 20, 20)
     
-    # Accretion disk (swirling particles)
+    #particles
     glPointSize(3)
     glBegin(GL_POINTS)
     for i in range(400):
@@ -493,7 +483,6 @@ def draw_wormhole():
         
         x = dist * math.cos(angle)
         y = dist * math.sin(angle)
-        # Slight thickness to the disk
         z = 4 * scale_mult * math.sin(i * 2.3 + time.time() * 2)
         glVertex3f(x, y, z)
     glEnd()
@@ -559,35 +548,78 @@ def setupCamera():
 # ============================================================
 # SECTION 8: PICKING & DRAGGING
 # ============================================================
+def _build_pick_ray(mx, my):
+    """Build a ray from camera through mouse pixel using pure math."""
+    cam = get_cam_pos()
+    # Determine look-at target
+    if cam_mode == 'overview':
+        target = (0, 0, 0)
+    elif cam_mode == 'track' and focused_planet >= 0:
+        target = get_planet_pos(focused_planet)
+    elif cam_mode == 'free':
+        yr, pr = math.radians(free_yaw), math.radians(free_pitch)
+        target = (cam[0]+math.cos(pr)*math.cos(yr),
+                  cam[1]+math.cos(pr)*math.sin(yr),
+                  cam[2]+math.sin(pr))
+    else:
+        return None, None
+    # Forward vector
+    fwd = [target[k]-cam[k] for k in range(3)]
+    fmag = math.sqrt(sum(v*v for v in fwd))
+    if fmag < 0.001: return None, None
+    fwd = [v/fmag for v in fwd]
+    # Right = forward x (0,0,1)
+    right = [fwd[1], -fwd[0], 0]
+    rmag = math.sqrt(right[0]**2 + right[1]**2)
+    if rmag < 0.001: return None, None
+    right = [v/rmag for v in right]
+    # Up = right x forward
+    up = [right[1]*fwd[2]-right[2]*fwd[1],
+          right[2]*fwd[0]-right[0]*fwd[2],
+          right[0]*fwd[1]-right[1]*fwd[0]]
+    # Mouse to NDC
+    ndcx = (2.0*mx/W_WIDTH) - 1.0
+    ndcy = 1.0 - (2.0*my/W_HEIGHT)
+    # FOV: 60 degrees vertical
+    thf = math.tan(math.radians(30))
+    asp = W_WIDTH / W_HEIGHT
+    # Ray direction
+    ray = [fwd[k] + ndcx*thf*asp*right[k] + ndcy*thf*up[k] for k in range(3)]
+    rmag = math.sqrt(sum(v*v for v in ray))
+    ray = [v/rmag for v in ray]
+    return cam, ray
+
 def screen_to_world(mx, my):
     try:
-        mv = glGetDoublev(GL_MODELVIEW_MATRIX)
-        pj = glGetDoublev(GL_PROJECTION_MATRIX)
-        vp = glGetIntegerv(GL_VIEWPORT)
-        wy = vp[3] - my
-        p1 = gluUnProject(mx, wy, 0.0, mv, pj, vp)
-        p2 = gluUnProject(mx, wy, 1.0, mv, pj, vp)
-        if abs(p2[2]-p1[2]) < 0.0001:
-            return None
-        t = -p1[2]/(p2[2]-p1[2])
-        return (p1[0]+t*(p2[0]-p1[0]), p1[1]+t*(p2[1]-p1[1]))
+        cam, ray = _build_pick_ray(mx, my)
+        if cam is None: return None
+        if abs(ray[2]) < 0.0001: return None
+        t = -cam[2] / ray[2]
+        return (cam[0]+ray[0]*t, cam[1]+ray[1]*t)
     except:
         return None
 
 def pick_planet(mx, my):
     try:
-        mv = glGetDoublev(GL_MODELVIEW_MATRIX)
-        pj = glGetDoublev(GL_PROJECTION_MATRIX)
-        vp = glGetIntegerv(GL_VIEWPORT)
-        wy = vp[3] - my
+        cam, ray = _build_pick_ray(mx, my)
+        if cam is None: return -1
         best = -1
-        best_d = 40
+        best_miss = 999999
         for i, p in enumerate(PLANETS):
+            if p.get('eaten', False): continue
             px, py, pz = get_planet_pos(i)
-            sx, sy, sz = gluProject(px, py, pz, mv, pj, vp)
-            d = math.sqrt((sx-mx)**2 + (sy-wy)**2)
-            if d < best_d:
-                best_d = d
+            # Vector from camera to planet
+            vx, vy, vz = px-cam[0], py-cam[1], pz-cam[2]
+            # Project onto ray to find closest point
+            t = vx*ray[0] + vy*ray[1] + vz*ray[2]
+            if t < 0: continue  # behind camera
+            # Closest point on ray to planet
+            cx = cam[0]+ray[0]*t; cy = cam[1]+ray[1]*t; cz = cam[2]+ray[2]*t
+            miss = math.sqrt((cx-px)**2+(cy-py)**2+(cz-pz)**2)
+            # Click radius: at least 15 units or 2x planet radius
+            click_r = max(p['radius']*scale_mult*2, 15)
+            if miss < click_r and miss < best_miss:
+                best_miss = miss
                 best = i
         return best
     except:
@@ -669,8 +701,8 @@ def keyboardListener(key, x, y):
         fx = math.cos(pr)*math.cos(yr)
         fy = math.cos(pr)*math.sin(yr)
         fz = math.sin(pr)
-        rx = math.cos(yr+math.pi/2)
-        ry = math.sin(yr+math.pi/2)
+        rx = math.cos(yr-math.pi/2)
+        ry = math.sin(yr-math.pi/2)
         if key == b'w':
             free_pos[0]+=fx*spd; free_pos[1]+=fy*spd; free_pos[2]+=fz*spd
         elif key == b's':
@@ -762,15 +794,14 @@ def motionListener(x, y):
         track_angle_h -= dx*0.3
         track_angle_v += dy*0.3
         track_angle_v = max(-10, min(89, track_angle_v))
+    elif mouse_left_down and cam_mode == 'free':
+        global free_yaw, free_pitch
+        free_yaw -= dx*0.3
+        free_pitch -= dy*0.3
+        free_pitch = max(-89, min(89, free_pitch))
 
 def passiveMotionListener(x, y):
-    global last_mx, last_my, free_yaw, free_pitch
-    if cam_mode == 'free':
-        dx = x - last_mx
-        dy = y - last_my
-        free_yaw -= dx*0.15
-        free_pitch -= dy*0.15
-        free_pitch = max(-89, min(89, free_pitch))
+    global last_mx, last_my
     last_mx, last_my = x, y
 
 def reset_view():
