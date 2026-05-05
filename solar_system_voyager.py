@@ -549,7 +549,6 @@ def setupCamera():
 # SECTION 8: PICKING & DRAGGING
 # ============================================================
 def _build_pick_ray(mx, my):
-    """Build a ray from camera through mouse pixel using pure math."""
     cam = get_cam_pos()
     # Determine look-at target
     if cam_mode == 'overview':
@@ -671,7 +670,7 @@ def keyboardListener(key, x, y):
         global dimension_shift
         dimension_shift = not dimension_shift
     elif key == b'c' or key == b'C':
-        # Trigger a comet shower - spawn 10 mini-comets
+        # Trigger a comet shower
         random.seed(int(time.time()*1000) % 99999)
         for _ in range(10):
             # Spawn from random direction far from center
@@ -749,15 +748,13 @@ def mouseListener(button, state, x, y):
             ctrl_held = (mods & GLUT_ACTIVE_CTRL) != 0
             hit = pick_planet(x, y)
             if ctrl_held and hit >= 0:
-                # Ctrl+Click = start dragging planet (no zoom)
                 dragging_planet = hit
             elif hit >= 0:
-                # Normal click = zoom/focus on planet
                 dragging_planet = -1
                 focus_on_planet(hit)
             else:
                 dragging_planet = -1
-        else: # GLUT_UP
+        else:
             mouse_left_down = False
             dragging_planet = -1
     elif button == GLUT_RIGHT_BUTTON and state == GLUT_DOWN:
@@ -850,7 +847,7 @@ def idle():
             for m in p['moons']:
                 m['orbit_angle'] += m['orbit_speed']*time_scale*dt*30 * speed_mult
                 
-            # Check if sucked into wormhole
+            #wormhole    
             px, py, pz = get_planet_pos(i)
             if dist3d((px, py, pz), (850, 0, 0)) < 80 * scale_mult:
                 p['eaten'] = True
